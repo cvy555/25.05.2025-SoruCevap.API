@@ -1,0 +1,185 @@
+﻿@{
+    ViewData["Title"] = "Sorular Listesi";
+    var apiBaseUrl = ViewBag.ApiBaseURL;
+}
+
+<div class="container mt-4">
+    <h2>@ViewData["Title"]</h2>
+
+    <div class="row">
+        <!-- Sol: Soru Listesi -->
+        <div class="col-md-8">
+            <div id="questionsContainer" class="row gy-3"></div>
+            <div id="loadError" class="alert alert-danger mt-3" style="display:none;">Sorular yüklenirken hata oluştu.</div>
+        </div>
+
+        <!-- Sağ: Soru Ekleme Formu -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><h4>Soru Ekle</h4></div>
+                <div class="card-body">
+                    <input type="hidden" id="txtId" />
+
+                    <div class="mb-3">
+                        <label for="txtTitle" class="form-label">Başlık</label>
+                        <input type="text" class="form-control" id="txtTitle" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="txtContent" class="form-label">İçerik</label>
+                        <textarea class="form-control" id="txtContent" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cbCategoryId" class="form-label">Kategori</label>
+                        <select class="form-select form-control" id="cbCategoryId">
+                            <option value="">Seçiniz</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="txtLink" class="form-label">YouTube Linki (Opsiyonel)</label>
+                        <input type="text" class="form-control" id="txtLink" />
+                    </div>
+
+                    <div class="mb-3 d-grid gap-2">
+                        <button class="btn btn-primary" id="btnSave">Kaydet</button>
+                    </div>
+
+                    <div class="alert mt-3" id="divResult" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            const apiBaseUrl = "@apiBaseUrl";
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                alert("Token bulunamadı. Lütfen giriş yapın.");
+                location.href = "/Login";
+                return;
+            }
+
+            loadQuestions();
+            loadCategories();
+
+            function loadQuestions() {
+                $.ajax({
+                    url: apiBaseUrl + "/Question/",
+                    type: "GET",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (questions) {
+                        const container = $("#questionsContainer");
+                        container.empty();
+                        if (!questions || questions.length === 0) {
+                            container.html('<p class="text-center">Hiç soru bulunamadı.</p>');
+                            return;
+                        }
+
+                        const answerPromises = questions.map(q => {
+                            return $.ajax({
+                                url: apiBaseUrl + "/Question/" + q.id + "/Answers",
+                                type: "GET",
+                                headers: { "Authorization": "Bearer " + token }
+                            });
+                        });
+
+                        $.when.apply($, answerPromises).done(function () {
+                            let answersData = arguments;
+                            if (questions.length === 1) {
+                                answersData = [arguments];
+                            }
+
+                            questions.forEach((q, index) => {
+                                const answers = answersData[index][0];
+                                const answerCount = Array.isArray(answers) ? answers.length : 0;
+
+                                const cardHtml = `
+                                    <div class="col-md-6">
+                                        <div class="card h-100 shadow-sm">
+                                            <div class="card-body d-flex flex-column">
+                                                <h5 class="card-title">${q.title}</h5>
+                                                <p class="card-text flex-grow-1">${q.content.length > 100 ? q.content.substring(0, 100) + '...' : q.content}</p>
+                                                <p class="card-text"><small class="text-muted">${answerCount} cevap var</small></p>
+                                            </div>
+                                        </div>
+                                    </div>`;
+                                container.append(cardHtml);
+                            });
+                        }).fail(function () {
+                            $("#loadError").show();
+                            container.empty();
+                        });
+                    },
+                    error: function () {
+                        $("#loadError").show();
+                        $("#questionsContainer").empty();
+                    }
+                });
+            }
+
+            function loadCategories() {
+                $.ajax({
+                    url: apiBaseUrl + "/Category/",
+                    type: "GET",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (data) {
+                        const dropdown = $("#cbCategoryId");
+                        dropdown.empty().append('<option value="">Seçiniz</option>');
+                        data.forEach(cat => {
+                            dropdown.append(`<option value="${cat.id}">${cat.name}</option>`);
+                        });
+                    },
+                    error: function (xhr) {
+                        console.error("Kategori yüklenemedi:", xhr);
+                    }
+                });
+            }
+
+            $("#btnSave").click(function () {
+                const title = $("#txtTitle").val();
+                const content = $("#txtContent").val();
+                const categoryId = $("#cbCategoryId").val();
+                const videoUrl = $("#txtLink").val();
+
+                if (!title || !content || !categoryId) {
+                    $("#divResult").show().removeClass().addClass("alert alert-danger").html("Tüm alanlar zorunludur.").fadeOut(4000);
+                    return;
+                }
+
+                const newQuestion = {
+                    title,
+                    content,
+                    categoryId,
+                    videoUrl
+                };
+
+                $.ajax({
+                    url: apiBaseUrl + "/Question",
+                    type: "POST",
+                    headers: { "Authorization": "Bearer " + token },
+                    contentType: "application/json",
+                    data: JSON.stringify(newQuestion),
+                    success: function (res) {
+                        if (res.status) {
+                            $("#divResult").show().removeClass().addClass("alert alert-success").html(res.message).fadeOut(3000);
+                            loadQuestions();
+                            $("#txtTitle, #txtContent, #txtLink").val("");
+                            $("#cbCategoryId").val("");
+                        } else {
+                            $("#divResult").show().removeClass().addClass("alert alert-danger").html(res.message).fadeOut(3000);
+                        }
+                    },
+                    error: function () {
+                        $("#divResult").show().removeClass().addClass("alert alert-danger").html("Kayıt hatası").fadeOut(3000);
+                    }
+                });
+            });
+        });
+    </script>
+}

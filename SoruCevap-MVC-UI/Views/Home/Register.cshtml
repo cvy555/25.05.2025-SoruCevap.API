@@ -1,0 +1,136 @@
+﻿
+@{
+    Layout = null;
+}
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SB Admin 2 - Register</title>
+    <link href="~/sbadmin/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,300,400,700,900" rel="stylesheet" />
+    <link href="~/sbadmin/css/sb-admin-2.min.css" rel="stylesheet" />
+</head>
+
+<body class="bg-primary d-flex justify-content-center align-items-center vh-100">
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body p-4">
+                        <h4 class="text-center mb-4">Kayıt Ol</h4>
+                        <form id="registerForm" onsubmit="return false;">
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <input type="text" class="form-control" id="UserName" placeholder="Kullanıcı Adı">
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <input type="text" class="form-control" id="FullName" placeholder="Tam İsim">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <input type="email" class="form-control" id="Email" placeholder="E-posta">
+                            </div>
+                            <div class="form-group">
+                                <input type="number" class="form-control" id="PhoneNumber" placeholder="Telefon Numarası">
+                            </div>
+                            <div class="form-group">
+                                <input type="password" class="form-control" id="Password" placeholder="Şifre">
+                            </div>
+                            <button id="registerBtn" class="btn btn-primary btn-block">Kayıt Ol</button>
+                        </form>
+                        <hr>
+                        <div id="registerResult" class="text-center mt-2 text-muted"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="~/sbadmin/vendor/jquery/jquery.min.js"></script>
+    <script src="~/sbadmin/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="~/sbadmin/vendor/jquery-easing/jquery.easing.min.js"></script>
+
+    <!-- Custom scripts for all pages-->
+    <script src="~/sbadmin/js/sb-admin-2.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            var apiBaseUrl = "@ViewBag.ApiBaseURL";
+            $("#registerBtn").click(function () {
+              if ($("#UserName").val() === "" || $("#password").val() === "") {
+                    $("#registerResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("text-danger")
+                        .html("Kullanıcı Adı ve Parola Giriniz!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+
+                  var  userName = $("#UserName").val();
+                  var   fullName = $("#FullName").val();
+                  var  email = $("#Email").val();
+                  var  password = $("#Password").val();
+                  var phoneNumber = $("#PhoneNumber").val();
+
+                  var register=new Object();
+                   register.userName=userName;
+                   register.password=password;
+                   register.fullName=fullName;
+                   register.email=email;
+                   register.phoneNumber=phoneNumber;
+
+
+                $.ajax({
+                    url: apiBaseUrl + "/User/Add",
+                    type: "POST",
+                    data: JSON.stringify(register),
+                    contentType: "application/json",
+                    success: function (d) {
+                        if (d.status) {
+                            $("#registerResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("text-success")
+                                .html("Kaydınız tamamlanmıştır. Giriş yapabilirsiniz.")
+                                .fadeOut(3000);
+
+
+                            setTimeout(function () {
+                                window.location.href = "/Login";
+                            }, 3000);
+                        } else {
+                            $("#registerResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("text-danger")
+                                .html(d.message)
+                                .fadeOut(3000);
+                        }
+                    },
+                    error: function (d) {
+                        $("#registerResult")
+                            .fadeIn()
+                            .removeClass()
+                            .addClass("text-danger")
+                            .html("Kayıt sırasında bir hata oluştu.")
+                            .fadeOut(3000);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

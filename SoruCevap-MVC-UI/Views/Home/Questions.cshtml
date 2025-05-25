@@ -1,0 +1,360 @@
+﻿@{
+  ViewData["Title"] = "Sorular";
+
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Sorular</h3>
+            </div>
+            <div class="card-body">
+                <h4><a href="/Categories">Kategoriler</a> --> <span id="catName"></span></h4>
+                <table class="table" id="tbQuestionList">
+                    <thead>
+                        <tr>
+                            <th>Sırası</th>
+                            <th>Kişi Adı</th>
+                            <th>Başlık</th>
+                            <th>İçerik</th>
+                            <th>Kategori</th>
+                            <th>Kayıt Tarihi</th>
+                            <th>Düzenleme Tarihi</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="card-footer"></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><h4>Soru Ekle - Güncelle</h4></div>
+            <div class="card-body">
+              
+                <div class="mb-3">
+                    <label>Soru Başlığı</label>
+                    <input type="hidden" class="form-control" id="txtId" />
+                    <input type="text" class="form-control" id="txtTitle" />
+                </div>
+                <div class="mb-3">
+                    <label>Soru İçeriği </label>
+                    <textarea class="form-control" id="txtContent" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label>Kategori</label>
+                    <select class="form-control" id="cbCategoryId">
+                        <option>Seçiniz</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label>Youtube Soru Linki(isteğe Bağlı)</label>
+                    <input type="text" class="form-control" id="txtLink" />
+                </div>
+
+                <div class="mb-3">
+                    <button class="btn btn-primary btn-md" title="Kaydet" id="btnSave">Kaydet</button>
+                    <button class="btn btn-secondary btn-md" title="Vazgeç" id="btnCancel" style="display:none;">Vazgeç</button>
+                    <button class="btn btn-warning btn-md" title="Düzenle" id="btnEdit" style="display:none;">Düzenle</button>
+                    <button class="btn btn-danger btn-md" title="Sil" id="btnDelete" style="display:none;">Sil</button>
+                    <div class="alert mt-3" id="divResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            var apiBaseUrl = "@ViewBag.ApiBaseURL";
+            var catId = "@ViewBag.CatId";
+             if(localStorage.getItem("token")=="" || localStorage.getItem("token")==null){
+                location.href="/Login";
+                return false;
+            }
+             var  token=localStorage.getItem("token");
+            GetCategoryById();
+            GetQuestionsList();
+            GetCategoryList();
+            $("#btnCancel").hide();
+            $("#btnEdit").hide();
+            $("#btnDelete").hide();
+            console.log(apiBaseUrl);
+
+            function GetQuestionsList() {
+                $.ajax({
+                    url: apiBaseUrl + "/Category/" + catId + "/Question",
+                    type: "GET",
+                     headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    success: function(d) {
+                        console.log("API'den gelen veriler: ", d);
+                        QuestionsToTable(d);
+                    },
+                    error: function(d) {}
+                });
+            }
+
+            function GetCategoryById() {
+                $.ajax({
+                    url: apiBaseUrl + "/Category/" + catId,
+                    type: "GET",
+                     headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    success: function(d) {
+                        $("#catName").html(d.name);
+                    },
+                    error: function(d) {}
+                });
+            }
+
+            function GetCategoryList() {
+                $.ajax({
+                    url: apiBaseUrl + "/Category/",
+                    type: "GET",
+                       headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    success: function(d) {
+                        $("#cbCategoryId").empty();
+                        var options = "";
+                        $.each(d, function(i, item) {
+                            if (item.id == catId) {
+                                options += '<option value="' + item.id + '" selected>' + item.name + '</option>';
+                            } else {
+                                options += '<option value="' + item.id + '">' + item.name + '</option>';
+                            }
+                        });
+                        $("#cbCategoryId").append(options);
+                    },
+                    error: function(d) {}
+                });
+            }
+
+
+                  function QuestionsToTable(data) {
+            $("#tbQuestionList tbody").empty();
+            var row = "";
+            var a = 0;
+            $.each(data, function(i, item) {
+                a++;
+                    row += "<tr>";
+                    row += "<td>"+  a  +"</td>";
+                    row+="<td>"+item.user.userName+"</td>";
+                    row += "<td>" + item.title + "</td>";
+                    row += "<td>" + item.content + "</td>";
+                    row += "<td>" + item.category.name + "</td>"
+                    row += "<td>" + FormatDate(item.createdTime) + "</td>";
+                    row += "<td>" + FormatDate(item.updatedTime) + "</td>";
+                    row += '<td><a class="btn btn-primary btn-md" href="/Answer/'+item.id+'">İncele</a><button class="btn btn-warning btn-md btnEdit" data-id="' + item.id + '">Güncelle</button></td>';
+                    row += "</tr>";
+                });
+
+
+            $("#tbQuestionList tbody").append(row);
+        }
+
+
+
+            $("#btnSave").click(function() {
+
+                if ($("#txtContent").val() == "" || $("#txtContent").val() == null) {
+                    $("#divResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("alert alert-danger mt-3")
+                        .html("Sorunuzu Giriniz!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+                
+                var title = $("#txtTitle").val();
+                var content = $("#txtContent").val();
+                var videoUrl = $("#txtLink").val();
+                var categoryId = $("#cbCategoryId").val();
+                var question = new Object();
+               
+                question.title = title;
+                question.content = content;
+                question.categoryId = categoryId;
+                question.videoUrl = videoUrl;
+                    $.ajax({
+                        url: apiBaseUrl + "/Question",
+                        type: "POST",
+                         headers: {
+                    "Authorization": "Bearer " + token
+                },
+                        data: JSON.stringify(question),
+                        contentType: "application/json",
+                        success: function(d) {
+                            if (d.status) {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                                GetQuestionsList();
+                                $("#btnCancel").click();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function(d) {
+                            console.error("Hata:", d);
+                        }
+                    });
+                
+            });
+
+            $(document).on("click", ".btnEdit", function() {
+                var id = $(this).attr("data-id");
+
+                $.ajax({
+                    url: apiBaseUrl + "/Question/" + id,
+                    type: "GET",
+                       headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    contentType: "application/json",
+                    success: function(d) {
+                        $("#btnSave").hide();
+                        $("#btnCancel").show();
+                        $("#btnEdit").show();
+                        $("#btnDelete").show();
+                        $("#txtId").val(id);
+                        $("#txtTitle").val(d.title);
+                        $("#txtContent").val(d.content);
+                         $("#txtLink").val(d.videoUrl);
+
+                        
+                    },
+                    error: function(d) {
+                        console.error("Hata:", d);
+                    }
+                });
+            });
+
+            $("#btnCancel").click(function() {
+                $("#btnCancel").hide();
+                $("#btnEdit").hide();
+                $("#btnDelete").hide();
+                $("#btnSave").show();
+                $("#txtTitle").val("");
+                $("#txtContent").val("");
+                $("#txtLink").val("");
+                $("#cbCategoryId").val(catId);
+                $("#txtId").val("");
+            });
+
+            $("#btnEdit").click(function() {
+
+                if ($("#txtContent").val() == "" || $("#txtContent").val() == null) {
+                    $("#divResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("alert alert-danger mt-3")
+                        .html("Sorunuzu Giriniz!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+               var id=$("#txtId").val();
+                var title = $("#txtTitle").val();
+                var content = $("#txtContent").val();
+                var videoUrl = $("#txtLink").val();
+                var categoryId = $("#cbCategoryId").val();
+                var question = new Object();
+                question.id = id;
+                question.title = title;
+                question.content = content;
+                question.categoryId = categoryId;
+                question.videoUrl = videoUrl;
+                    $.ajax({
+                        url: apiBaseUrl + "/Question/" ,
+                        type: "PUT",
+                         headers: {
+                    "Authorization": "Bearer " + token
+                },
+                        data: JSON.stringify(question),
+                        contentType: "application/json",
+                        success: function(d) {
+                            if (d.status) {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                                GetQuestionsList();
+                                $("#btnCancel").click();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function(d) {
+                            console.error("Hata:", d);
+                        }
+                    });
+                
+            });
+
+            $("#btnDelete").click(function() {
+                var id = $("#txtId").val();
+
+
+
+                    $.ajax({
+                        url: apiBaseUrl + "/Question/" + id,
+                        type: "DELETE",
+                           headers: {
+                    "Authorization": "Bearer " + token
+                },
+                        success: function(d) {
+                            if (d.status) {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                                GetQuestionsList();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function(d) {
+                            console.error("Hata:", d);
+                        }
+                    });
+
+            });
+
+        });
+    </script>
+}
+
+

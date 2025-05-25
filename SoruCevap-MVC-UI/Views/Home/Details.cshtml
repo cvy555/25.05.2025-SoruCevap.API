@@ -1,0 +1,279 @@
+﻿@{
+    ViewData["Title"] = "Soru Detayları";
+}
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h3 id="questionTitle">Soru Başlığı</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Kategori:</strong> <span id="questionCategory">Yükleniyor...</span></p>
+            <p><strong>Soran Kişi:</strong> <span id="questionUser">Yükleniyor...</span></p>
+            <p><strong>İçerik:</strong> <span id="questionContent">Yükleniyor...</span></p>
+            <div id="videoContainer" class="mt-3"></div>
+        </div>
+        <div class="card-footer text-muted">
+            <small>Kayıt Tarihi: <span id="createdDate"></span> | Güncelleme: <span id="updatedDate"></span></small>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h4>Cevaplar</h4>
+        </div>
+        <div class="card-body">
+            <ul id="answerList" class="list-group">
+                <li class="list-group-item">Yükleniyor...</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5>Cevap Ekle / Güncelle</h5>
+        </div>
+        <div class="card-body">
+            <input type="hidden" id="answerId" />
+            <textarea id="answerContent" class="form-control mb-3" rows="3" placeholder="Cevabınızı yazın..."></textarea>
+            <button class="btn btn-primary" id="btnAnswerAdd">Ekle</button>
+            <button class="btn btn-danger" id="btnAnswerDelete" style="display:none;">Sil</button>
+            <button class="btn btn-secondary" id="btnCancel" style="display:none;">Vazgeç</button>
+            <div id="answerResult" class="alert mt-3" style="display:none;"></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            const apiBaseUrl = "@ViewBag.ApiBaseURL";
+            const detailsId = "@ViewBag.DetailsId";
+
+            const token = localStorage.getItem("token");
+            if (!token) {
+                location.href = "/Login";
+                return;
+            }            
+        const userRolesStr = localStorage.getItem("userRoles") || ""; 
+        const userRoles = userRolesStr.toLowerCase().split(",").map(r => r.trim()); 
+        const isAdmin = userRoles.includes("admin");
+
+
+          
+            function loadQuestionData() {
+                $.when(
+                    $.ajax({ url: `${apiBaseUrl}/Question/${detailsId}`, type: "GET", headers: { "Authorization": "Bearer " + token } }),
+                    $.ajax({ url: `${apiBaseUrl}/User/List`, type: "GET", headers: { "Authorization": "Bearer " + token } }),
+                    $.ajax({ url: `${apiBaseUrl}/Category`, type: "GET", headers: { "Authorization": "Bearer " + token } })
+                ).done(function (questionData, usersData, categoriesData) {
+                    const q = questionData[0];
+                    const users = usersData[0];
+                    const categories = categoriesData[0];
+
+                    q.user = users.find(u => u.id === q.userId) || { userName: "Bilinmiyor" };
+                    q.category = categories.find(c => c.id === q.categoryId) || { name: "Bilinmiyor" };
+
+                    $("#questionTitle").text(q.title);
+                    $("#questionContent").text(q.content);
+                    $("#questionCategory").text(q.category.name);
+                    $("#questionUser").text(q.user.userName);
+                    $("#createdDate").text(FormatDate(q.createdTime));
+                    $("#updatedDate").text(FormatDate(q.updatedTime));
+
+                    if (q.videoUrl && q.videoUrl.includes("youtube")) {
+                        const videoId = getYoutubeVideoId(q.videoUrl);
+                        if (videoId) {
+                            $("#videoContainer").html(`
+                                <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/${videoId}"
+                                    frameborder="0" allowfullscreen>
+                                </iframe>
+                            `);
+                        }
+                    }
+                }).fail(function () {
+                    alert("Soru verileri yüklenirken hata oluştu.");
+                });
+            }
+
+            // Cevapları ve kullanıcılarını yükle
+            function loadAnswerData() {
+                $.when(
+                    $.ajax({ url: `${apiBaseUrl}/Question/${detailsId}/Answers`, type: "GET", headers: { "Authorization": "Bearer " + token } }),
+                    $.ajax({ url: `${apiBaseUrl}/User/List`, type: "GET", headers: { "Authorization": "Bearer " + token } })
+                ).done(function (answersData, usersData) {
+                    const answers = answersData[0];
+                    const users = usersData[0];
+
+                    answers.forEach(a => {
+                        a.user = users.find(u => u.id === a.userId) || { userName: "Bilinmiyor" };
+                    });
+
+                    renderAnswers(answers);
+                }).fail(function () {
+                    alert("Cevaplar yüklenirken hata oluştu.");
+                });
+            }
+
+
+                  function renderAnswers(answers, isAdmin) {
+            $("#answerList").empty();
+
+            if (answers.length === 0) {
+                $("#answerList").append(`<li class="list-group-item">Henüz cevap eklenmemiş.</li>`);
+            } else {
+                answers.forEach(answer => {
+                    // Sil butonu sadece adminler görür
+                    const deleteBtn = isAdmin ? `<button class="btn btn-sm btn-danger btnDeleteAnswer" data-id="${answer.id}">Sil</button>` : "";
+
+                    const li = `
+                        <li class="list-group-item">
+                            <strong>${answer.user.userName}:</strong> ${answer.content}
+                            <br><small class="text-muted">${FormatDate(answer.createdTime)}</small>
+                            <div class="mt-2">
+                                ${deleteBtn}
+                            </div>
+                        </li>
+                    `;
+                    $("#answerList").append(li);
+                });
+            }
+        }
+
+
+            // YouTube video ID çekme fonksiyonu
+            function getYoutubeVideoId(url) {
+                const regExp = /(?:https?:\/\/)?(?:www\.)?youtu(?:\.be\/|be\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/;
+                const match = url.match(regExp);
+                return match ? match[1] : null;
+            }
+
+            // Tarih formatlama fonksiyonu
+            function FormatDate(dateStr) {
+                if (!dateStr) return "-";
+                const d = new Date(dateStr);
+                return d.toLocaleDateString() + " " + d.toLocaleTimeString();
+            }
+
+            // Cevap Ekle
+            $("#btnAnswerAdd").click(function () {
+                const content = $("#answerContent").val().trim();
+                if (!content) {
+                    ShowAnswerResult("Cevap boş olamaz!", false);
+                    return;
+                }
+
+                const answer = {
+                    content: content,
+                    questionId: detailsId
+                };
+
+                $.ajax({
+                    url: `${apiBaseUrl}/Answer`,
+                    type: "POST",
+                    headers: { "Authorization": "Bearer " + token },
+                    contentType: "application/json",
+                    data: JSON.stringify(answer),
+                    success: function (d) {
+                        ShowAnswerResult(d.message, d.status);
+                        if (d.status) {
+                            ResetForm();
+                            loadAnswerData();
+                        }
+                    },
+                    error: function () {
+                        ShowAnswerResult("Cevap eklenirken hata oluştu.", false);
+                    }
+                });
+            });
+
+            // Cevap Sil (listeden sil butonuna basınca)
+            $(document).on("click", ".btnDeleteAnswer", function () {
+                const id = $(this).data("id");
+                if (!id) return;
+
+                if (!confirm("Bu cevabı silmek istediğinize emin misiniz?")) return;
+
+                $.ajax({
+                    url: `${apiBaseUrl}/Answer/${id}`,
+                    type: "DELETE",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (d) {
+                        ShowAnswerResult(d.message, d.status);
+                        if (d.status) {
+                            loadAnswerData();
+                            ResetForm();
+                        }
+                    },
+                    error: function () {
+                        ShowAnswerResult("Cevap silinirken hata oluştu.", false);
+                    }
+                });
+            });
+
+            // Düzenleme butonuna basınca formu doldur
+            $(document).on("click", ".btnEditAnswer", function () {
+                const id = $(this).data("id");
+                const content = $(this).data("content");
+
+                $("#answerId").val(id);
+                $("#answerContent").val(content);
+                $("#btnAnswerAdd").hide();
+                $("#btnAnswerUpdate").show();
+                $("#btnAnswerDelete").toggle(isAdmin);
+                $("#btnCancel").show();
+            });
+
+            // Sil butonu formdaki
+            $("#btnAnswerDelete").click(function () {
+                const id = $("#answerId").val();
+                if (!id) return;
+
+                if (!confirm("Bu cevabı silmek istediğinize emin misiniz?")) return;
+
+                $.ajax({
+                    url: `${apiBaseUrl}/Answer/${id}`,
+                    type: "DELETE",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (d) {
+                        ShowAnswerResult(d.message, d.status);
+                        if (d.status) {
+                            ResetForm();
+                            loadAnswerData();
+                        }
+                    },
+                    error: function () {
+                        ShowAnswerResult("Cevap silinirken hata oluştu.", false);
+                    }
+                });
+            });
+
+            // Vazgeç butonu
+            $("#btnCancel").click(function () {
+                ResetForm();
+            });
+
+            // Formu resetle
+            function ResetForm() {
+                $("#answerId").val("");
+                $("#answerContent").val("");
+                $("#btnAnswerAdd").show();
+                $("#btnAnswerUpdate").hide();
+                $("#btnAnswerDelete").hide();
+                $("#btnCancel").hide();
+                $("#answerResult").hide();
+            }
+
+            // Sonuç mesajı göster
+            function ShowAnswerResult(msg, status) {
+                const alertClass = status ? "alert-success" : "alert-danger";
+                $("#answerResult").removeClass().addClass("alert mt-3 " + alertClass).html(msg).fadeIn().delay(3000).fadeOut();
+            }
+
+            // Sayfa yüklendiğinde çağır
+            loadQuestionData();
+            loadAnswerData();
+        });
+    </script>
+}

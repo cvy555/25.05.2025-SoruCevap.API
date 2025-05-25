@@ -1,0 +1,280 @@
+﻿@{
+    ViewData["Title"] = "Ana Sayfa";
+    var apiBaseUrl = ViewBag.ApiBaseURL;
+    var catId = ViewBag.CatId;
+}
+
+<div class="row">
+    <!-- Sol: Soru Kartları -->
+    <div class="col-md-8">
+        <div class="mb-3">
+            <label for="filterCategory" class="form-label">Kategoriye Göre Filtrele</label>
+            <select class="form-control" id="filterCategory">
+                <option value="">Tüm Kategoriler</option>
+            </select>
+        </div>
+        <div class="row" id="questionCards">
+            <!-- Soru kartları buraya gelecek -->
+        </div>
+    </div>
+
+    <!-- Sağ: Soru Ekleme Formu -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><h4>Soru Ekle</h4></div>
+            <div class="card-body">
+                <input type="hidden" id="txtId" />
+
+                <div class="mb-3">
+                    <label for="txtTitle" class="form-label">Başlık</label>
+                    <input type="text" class="form-control" id="txtTitle" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="txtContent" class="form-label">İçerik</label>
+                    <textarea class="form-control" id="txtContent" rows="3"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="cbCategoryId" class="form-label">Kategori</label>
+                    <select class="form-control" id="cbCategoryId">
+                        <option value="">Seçiniz</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="txtLink" class="form-label">YouTube Linki (İsteğe Bağlı)</label>
+                    <input type="text" class="form-control" id="txtLink" />
+                </div>
+
+                <div class="mb-3 d-grid gap-2">
+                    <button class="btn btn-primary" id="btnSave">Kaydet</button>
+                    <button class="btn btn-secondary" id="btnCancel" style="display:none;">Vazgeç</button>
+                    <button class="btn btn-warning" id="btnEdit" style="display:none;">Düzenle</button>
+                    <button class="btn btn-danger" id="btnDelete" style="display:none;">Sil</button>
+                </div>
+
+                <div class="alert mt-3" id="divResult" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            const apiBaseUrl = "@apiBaseUrl";
+            const catId = "@catId";
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                location.href = "/Login";
+                return;
+            }
+
+            let allQuestions = [];
+            let allUsers = [];
+            let allCategories = [];
+
+            loadAllData();
+            setupDropdowns();
+
+            $("#btnCancel").click(clearForm);
+            $("#btnSave").click(saveQuestion);
+            $("#btnEdit").click(updateQuestion);
+            $("#btnDelete").click(deleteQuestion);
+            $("#filterCategory").change(filterQuestions);
+
+            function setupDropdowns() {
+                $.ajax({
+                    url: apiBaseUrl + "/Category/",
+                    type: "GET",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (data) {
+                        const cb = $("#cbCategoryId");
+                        const fc = $("#filterCategory");
+                        cb.empty().append('<option value="">Seçiniz</option>');
+                        fc.empty().append('<option value="">Tüm Kategoriler</option>');
+
+                        data.forEach(cat => {
+                            cb.append(`<option value="${cat.id}" ${cat.id == catId ? 'selected' : ''}>${cat.name}</option>`);
+                            fc.append(`<option value="${cat.id}" ${cat.id == catId ? 'selected' : ''}>${cat.name}</option>`);
+                        });
+                    },
+                    error: function (xhr) {
+                        console.error("Kategori yüklenemedi:", xhr);
+                    }
+                });
+            }
+
+            function loadAllData() {
+                $.when(
+                    $.ajax({ url: apiBaseUrl + "/Question", type: "GET", headers: { "Authorization": "Bearer " + token } }),
+                    $.ajax({ url: apiBaseUrl + "/User/List", type: "GET", headers: { "Authorization": "Bearer " + token } }),
+                    $.ajax({ url: apiBaseUrl + "/Category", type: "GET", headers: { "Authorization": "Bearer " + token } })
+                ).done(function (questionsData, usersData, categoriesData) {
+                    allQuestions = questionsData[0];
+                    allUsers = usersData[0];
+                    allCategories = categoriesData[0];
+
+                    allQuestions.forEach(q => {
+                        q.user = allUsers.find(u => u.id === q.userId) || { userName: "Bilinmiyor" };
+                        q.category = allCategories.find(c => c.id === q.categoryId) || { name: "Bilinmiyor" };
+                    });
+
+                    renderQuestions(allQuestions);
+                });
+            }
+
+            function filterQuestions() {
+                const selectedCategoryId = $("#filterCategory").val();
+                if (!selectedCategoryId) {
+                    renderQuestions(allQuestions);
+                } else {
+                    const filtered = allQuestions.filter(q => q.categoryId == selectedCategoryId);
+                    renderQuestions(filtered);
+                }
+            }
+
+            function renderQuestions(questions) {
+                const container = $("#questionCards");
+                container.empty();
+
+                if (!questions.length) {
+                    container.append('<div class="col-12"><div class="alert alert-info">Soru bulunamadı.</div></div>');
+                    return;
+                }
+
+                questions.forEach(q => {
+                    const card = `
+                         <div class="col-md-6 mb-4">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">${q.title}</h5>
+                                    <p class="card-text"><strong>Kategori:</strong> ${q.category?.name || "Bilinmiyor"}</p>
+                                    <p class="card-text"><small class="text-muted">Yazan: ${q.user?.userName || "Bilinmiyor"}</small></p>
+                                    <div class="d-flex justify-content-between mt-3">
+                                        <button class="btn btn-info btn-sm" onclick="location.href='Details/${q.id}'">Detaylar</button>
+                                        <button class="btn btn-warning btn-sm" onclick="editQuestion(${q.id})">Düzenle</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.append(card);
+                });
+            }
+
+            window.editQuestion = function (id) {
+                $.ajax({
+                    url: apiBaseUrl + "/Question/" + id,
+                    type: "GET",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (d) {
+                        $("#btnSave").hide();
+                        $("#btnCancel").show();
+                        $("#btnEdit").show();
+                        $("#btnDelete").show();
+                        $("#txtId").val(id);
+                        $("#txtTitle").val(d.title);
+                        $("#txtContent").val(d.content);
+                        $("#txtLink").val(d.videoUrl);
+                        $("#cbCategoryId").val(d.categoryId);
+                    }
+                });
+            }
+
+            function saveQuestion() {
+                const title = $("#txtTitle").val();
+                const content = $("#txtContent").val();
+                const videoUrl = $("#txtLink").val();
+                const categoryId = $("#cbCategoryId").val();
+
+                if (!content || !title || !categoryId) {
+                    showResult("Tüm zorunlu alanları doldurun.", "danger");
+                    return;
+                }
+
+                const question = { title, content, categoryId, videoUrl };
+
+                $.ajax({
+                    url: apiBaseUrl + "/Question",
+                    type: "POST",
+                    headers: { "Authorization": "Bearer " + token },
+                    contentType: "application/json",
+                    data: JSON.stringify(question),
+                    success: function (d) {
+                        showResult(d.message, d.status ? "success" : "danger");
+                        if (d.status) {
+                            loadAllData();
+                            clearForm();
+                        }
+                    }
+                });
+            }
+
+            function updateQuestion() {
+                const id = $("#txtId").val();
+                const title = $("#txtTitle").val();
+                const content = $("#txtContent").val();
+                const videoUrl = $("#txtLink").val();
+                const categoryId = $("#cbCategoryId").val();
+
+                if (!content || !title || !categoryId) {
+                    showResult("Tüm zorunlu alanları doldurun.", "danger");
+                    return;
+                }
+
+                const question = { id, title, content, categoryId, videoUrl };
+
+                $.ajax({
+                    url: apiBaseUrl + "/Question",
+                    type: "PUT",
+                    headers: { "Authorization": "Bearer " + token },
+                    contentType: "application/json",
+                    data: JSON.stringify(question),
+                    success: function (d) {
+                        showResult(d.message, d.status ? "success" : "danger");
+                        if (d.status) {
+                            loadAllData();
+                            clearForm();
+                        }
+                    }
+                });
+            }
+
+            function deleteQuestion() {
+                const id = $("#txtId").val();
+                $.ajax({
+                    url: apiBaseUrl + "/Question/" + id,
+                    type: "DELETE",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function (d) {
+                        showResult(d.message, d.status ? "success" : "danger");
+                        if (d.status) {
+                            loadAllData();
+                            clearForm();
+                        }
+                    }
+                });
+            }
+
+            function clearForm() {
+                $("#txtId, #txtTitle, #txtContent, #txtLink").val("");
+                $("#cbCategoryId").val("");
+                $("#btnSave").show();
+                $("#btnEdit, #btnDelete, #btnCancel").hide();
+            }
+
+            function showResult(message, type) {
+                $("#divResult")
+                    .stop(true, true)
+                    .fadeIn()
+                    .removeClass()
+                    .addClass("alert alert-" + type + " mt-3")
+                    .html(message)
+                    .delay(3000).fadeOut();
+            }
+        });
+    </script>
+}

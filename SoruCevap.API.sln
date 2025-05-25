@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35913.81
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoruCevap.API", "SoruCevap.API\SoruCevap.API.csproj", "{A20DD9A4-97DA-48C9-BED7-EAD2F2B0207D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoruCevap.UI", "SoruCevap-MVC-UI\SoruCevap.UI.csproj", "{EDC0FCD2-2DD3-433D-8B40-36DEE97A487C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A20DD9A4-97DA-48C9-BED7-EAD2F2B0207D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A20DD9A4-97DA-48C9-BED7-EAD2F2B0207D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A20DD9A4-97DA-48C9-BED7-EAD2F2B0207D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A20DD9A4-97DA-48C9-BED7-EAD2F2B0207D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EDC0FCD2-2DD3-433D-8B40-36DEE97A487C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDC0FCD2-2DD3-433D-8B40-36DEE97A487C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDC0FCD2-2DD3-433D-8B40-36DEE97A487C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDC0FCD2-2DD3-433D-8B40-36DEE97A487C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CA315E87-002B-417E-B0DA-00C44E3553B6}
+	EndGlobalSection
+EndGlobal

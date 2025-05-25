@@ -1,0 +1,351 @@
+﻿@{
+    ViewData["Title"] = "Answers";
+
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Cevaplar</h3>
+            </div>
+            <div class="card-body">
+                <h4><a href="/Sorular">Soru</a> --> <span id="QuestName"></span></h4>
+                <table class="table" id="tbAnswerList">
+                    <thead>
+                        <tr>
+                            <th>Sırası</th>
+                            <th>Kişi Adı</th>
+                            <th>İçerik</th>
+                            <th>Kategori</th>
+                            <th>Kayıt Tarihi</th>
+                            <th>Düzenleme Tarihi</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="card-footer"></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><h4>Cevap Ekle - Güncelle</h4></div>
+            <div class="card-body">
+                
+                    <input type="hidden" class="form-control" id="txtId" />
+                    
+               
+                <div class="mb-3">
+                    <label>Cevap İçeriği </label>
+                    <textarea class="form-control" id="txtContent" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label>Sorunuzu Seçiniz</label>
+                    <select class="form-control" id="cbQuestionId">
+                        <option>Seçiniz</option>
+                    </select>
+                    <div class="mb-3">
+                        <label>Youtube Soru Linki(isteğe Bağlı)</label>
+                        <input type="text" class="form-control" id="txtLink" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <button class="btn btn-primary btn-md" title="Kaydet" id="btnSave">Kaydet</button>
+                    <button class="btn btn-secondary btn-md" title="Vazgeç" id="btnCancel" style="display:none;">Vazgeç</button>
+                    <button class="btn btn-warning btn-md" title="Düzenle" id="btnEdit" style="display:none;">Düzenle</button>
+                    <button class="btn btn-danger btn-md" title="Sil" id="btnDelete" style="display:none;">Sil</button>
+                    <div class="alert mt-3" id="divResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            var apiBaseUrl = "@ViewBag.ApiBaseURL";
+            var QuestId = "@ViewBag.QuestId";
+             if(localStorage.getItem("token")=="" || localStorage.getItem("token")==null){
+                location.href="/Login";
+                return false;
+            }
+             var  token=localStorage.getItem("token");
+            GetQuestionList();
+            GetAnswersList();
+            GetQuestionById();
+            $("#btnCancel").hide();
+            $("#btnEdit").hide();
+            $("#btnDelete").hide();
+            console.log(apiBaseUrl);
+
+            function GetAnswersList() {
+                $.ajax({
+                    url: apiBaseUrl + "/Question/" + QuestId + "/Answers",
+                    type: "GET",
+                     headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    success: function(d) {
+                        console.log("API'den gelen veriler: ", d);  // Veriyi kontrol et
+                       AnswerToTable(d);
+                    },
+                    error: function(d) {}
+                });
+            }
+
+            function GetQuestionById() {
+                $.ajax({
+                    url: apiBaseUrl + "/Question/" + QuestId,
+                    type: "GET",
+                     headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    success: function(d) {
+                        $("#QuestName").html(d.title);
+                    },
+                    error: function(d) {}
+                });
+            }
+
+            function GetQuestionList() {
+                $.ajax({
+                    url: apiBaseUrl + "/Question/",
+                    type: "GET",
+                       headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    success: function(d) {
+                        $("#cbQuestionId").empty();
+                        var options = "";
+                        $.each(d, function(i, item) {
+                            if (item.id == QuestId) {
+                                options += '<option value="' + item.id + '" selected>' + item.title + '</option>';
+                            } else {
+                                options += '<option value="' + item.id + '">' + item.title + '</option>';
+                            }
+                        });
+                        $("#cbQuestionId").append(options);
+                    },
+                    error: function(d) {}
+                });
+            }
+
+
+                  function AnswerToTable(data) {
+            $("#tbAnswerList tbody").empty();
+            var row = "";
+            var a = 0;
+            $.each(data, function(i, item) {
+                a++;
+                    row += "<tr>";
+                    row += "<td>"+  a  +"</td>";
+                    row+="<td>"+item.user.userName+"</td>";
+                    row += "<td>" + item.content + "</td>";
+                    row += "<td>" + item.question.title + "</td>"
+                    row += "<td>" + FormatDate(item.createdTime) + "</td>";
+                    row += "<td>" + FormatDate(item.updatedTime) + "</td>";
+                    row += '<td><a class="btn btn-primary btn-md" href="/Answer/'+item.id+'">İncele</a><button class="btn btn-warning btn-md btnEdit" data-id="' + item.id + '">Güncelle</button></td>';
+                    row += "</tr>";
+                });
+
+
+            $("#tbAnswerList tbody").append(row);
+        }
+
+
+
+            $("#btnSave").click(function() {
+
+                if ($("#txtContent").val() == "" || $("#txtContent").val() == null) {
+                    $("#divResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("alert alert-danger mt-3")
+                        .html("Sorunuzu Giriniz!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+
+
+                var content = $("#txtContent").val();
+                var videoUrl = $("#txtLink").val();
+                var questionId = $("#cbQuestionId").val();
+                var answer = new Object();
+
+
+                answer.content = content;
+                answer.questionId = questionId;
+                answer.videoUrl = videoUrl;
+                    $.ajax({
+                        url: apiBaseUrl + "/Answer",
+                        type: "POST",
+                         headers: {
+                    "Authorization": "Bearer " + token
+                },
+                        data: JSON.stringify(answer),
+                        contentType: "application/json",
+                        success: function(d) {
+                            if (d.status) {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                                GetAnswersList();
+                                $("#btnCancel").click();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function(d) {
+                            console.error("Hata:", d);
+                        }
+                    });
+
+            });
+
+            $(document).on("click", ".btnEdit", function() {
+                var id = $(this).attr("data-id");
+
+                $.ajax({
+                    url: apiBaseUrl + "/Answer/" + id,
+                    type: "GET",
+                       headers: {
+                    "Authorization": "Bearer " + token
+                },
+                    contentType: "application/json",
+                    success: function(d) {
+                        $("#btnSave").hide();
+                        $("#btnCancel").show();
+                        $("#btnEdit").show();
+                        $("#btnDelete").show();
+                        $("#txtContent").val(d.content);
+                         $("#txtLink").val(d.videoUrl);
+                         $("#txtId").val(d.id);
+
+
+                    },
+                    error: function(d) {
+                        console.error("Hata:", d);
+                    }
+                });
+            });
+
+            $("#btnCancel").click(function() {
+                $("#btnCancel").hide();
+                $("#btnEdit").hide();
+                $("#btnDelete").hide();
+                $("#btnSave").show();
+                $("#txtContent").val("");
+                $("#txtLink").val("");
+                $("#cbQuestionId").val(QuestId);
+                $("#txtId").val("");
+            });
+
+            $("#btnEdit").click(function() {
+
+                if ($("#txtContent").val() == "" || $("#txtContent").val() == null) {
+                    $("#divResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("alert alert-danger mt-3")
+                        .html("Sorunuzu Giriniz!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+              var id = $("#txtId").val();
+ 
+                var content = $("#txtContent").val();
+                var videoUrl = $("#txtLink").val();
+                var questionId = $("#cbQuestionId").val();
+                var answer = new Object();
+                answer.id = id;
+                answer.content = content;
+                answer.questionId = questionId;
+                answer.videoUrl = videoUrl;
+                    $.ajax({
+                       url: apiBaseUrl + "/Answer",
+                        type: "PUT",
+                         headers: {
+                    "Authorization": "Bearer " + token
+                },
+                        data: JSON.stringify(answer),
+                        contentType: "application/json",
+                        success: function(d) {
+                            if (d.status) {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                                GetAnswersList();
+                                $("#btnCancel").click();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function(d) {
+                            console.error("Hata:", d);
+                        }
+                    });
+
+            });
+
+            $("#btnDelete").click(function() {
+                var id = $("#txtId").val();
+
+
+
+                    $.ajax({
+                        url: apiBaseUrl + "/Answer/" + id,
+                        type: "DELETE",
+                           headers: {
+                    "Authorization": "Bearer " + token
+                },
+                        success: function(d) {
+                            if (d.status) {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                                GetAnswersList();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function(d) {
+                            console.error("Hata:", d);
+                        }
+                    });
+
+            });
+
+        });
+    </script>
+}
